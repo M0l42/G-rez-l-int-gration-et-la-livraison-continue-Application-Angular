@@ -1,0 +1,6 @@
+services:
+  app:
+    build: .
+    image: olympic-tracker
+    ports:
+      - "80:80"
