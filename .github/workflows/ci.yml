@@ -1,0 +1,76 @@
+# CI pipeline, identical in the Angular and Java repos.
+# It adapts to the project type found by the `detect` job.
+
+name: CI
+
+# ---------------------------------------------------------------------------
+# WHEN does it run?
+# - every push to main or to a ci/... branch ('**' also matches slashes,
+#   so ci/foo/bar works too; quoted because YAML treats a leading * specially)
+# - every pull request that targets main
+# ---------------------------------------------------------------------------
+on:
+  push:
+    branches: [main, 'ci/**']
+  pull_request:
+    branches: [main]
+
+# ---------------------------------------------------------------------------
+# Runs in the same `group` never overlap. A new push to the same branch
+# cancels the run in progress, EXCEPT on main (a release must never be
+# cut in half). `github.ref` is e.g. refs/heads/ci/workflow.
+# ---------------------------------------------------------------------------
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# ---------------------------------------------------------------------------
+# Rights of the automatic GITHUB_TOKEN. Read-only by default; a job that
+# needs more (push an image, create a release) asks for it itself.
+# ---------------------------------------------------------------------------
+permissions:
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # detect: decide "node" or "gradle" once, and publish it for later jobs.
+  # Each job runs on a FRESH machine, so a value only reaches another job
+  # if it is declared as a job output.
+  # -------------------------------------------------------------------------
+  detect:
+    runs-on: ubuntu-latest
+
+    # Layer 2: job output  <-  step output (step id "detect", key "type").
+    # Other jobs read it as  needs.detect.outputs.type
+    outputs:
+      type: ${{ steps.detect.outputs.type }}
+
+    steps:
+      # The machine starts empty: fetch the repository first.
+      - uses: actions/checkout@v4
+
+      # Layer 1: a step publishes an output by appending key=value to the
+      # file whose path is in $GITHUB_OUTPUT. The step needs an `id`.
+      - id: detect
+        name: Detect project type
+        run: |
+          if [ -f package.json ]; then
+            echo "type=node" >> "$GITHUB_OUTPUT"
+          elif [ -f build.gradle ]; then
+            echo "type=gradle" >> "$GITHUB_OUTPUT"
+          else
+            # "::error::" makes GitHub show a red annotation on the run page
+            echo "::error::Unknown project type (no package.json or build.gradle)"
+            exit 1
+          fi
+
+  # -------------------------------------------------------------------------
+  # TEMPORARY: proves the output crosses from one job to another.
+  # `needs` makes it wait for detect AND gives access to its outputs.
+  # We will replace it with the real `test` job.
+  # -------------------------------------------------------------------------
+  show-type:
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Project type is '${{ needs.detect.outputs.type }}'"
