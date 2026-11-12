@@ -67,6 +67,9 @@ jobs:
   test:
     needs: detect
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
         - uses: actions/checkout@v4
         - name: Set up Node.js
@@ -84,3 +87,16 @@ jobs:
             cache: gradle
         - name: run test script
           run: ./run-tests.sh
+        - name: Upload test results
+          if: always()  # even if the tests failed, so we can see the report
+          uses: actions/upload-artifact@v4
+          with:
+            name: test-results
+            path: 'test-results'
+        - name: Render test report
+          if: always()  # even if the tests failed, so we can see the report
+          uses: dorny/test-reporter@v1
+          with:
+            name: Test Report
+            path: 'test-results/*.xml'
+            reporter: 'java-junit'
