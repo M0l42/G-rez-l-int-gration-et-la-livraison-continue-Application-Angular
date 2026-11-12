@@ -64,13 +64,23 @@ jobs:
             exit 1
           fi
 
-  # -------------------------------------------------------------------------
-  # TEMPORARY: proves the output crosses from one job to another.
-  # `needs` makes it wait for detect AND gives access to its outputs.
-  # We will replace it with the real `test` job.
-  # -------------------------------------------------------------------------
-  show-type:
+  test:
     needs: detect
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Project type is '${{ needs.detect.outputs.type }}'"
+        - uses: actions/checkout@v4
+        - name: Set up Node.js
+          if: needs.detect.outputs.type == 'node'
+          uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: npm
+        - name: Set up Java
+          if: needs.detect.outputs.type == 'gradle'
+          uses: actions/setup-java@v4
+          with:
+            distribution: 'temurin'
+            java-version: '21'
+            cache: gradle
+        - name: run test script
+          run: ./run-tests.sh
