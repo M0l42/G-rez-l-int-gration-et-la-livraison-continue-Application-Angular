@@ -42,6 +42,12 @@ npm test
 
 Our test suite covers critical components, ensuring stability and reliability.
 
+You can also use the unified test script (same script as the Java API), which copies the JUnit XML reports into `test-results/`:
+
+```bash
+./run-tests.sh
+```
+
 ### Packaging
 
 To package the application for distribution, run:
@@ -56,7 +62,14 @@ This will create a distributable package containing the compiled code and necess
 
 To deploy application on nginx web server with docker you can use nginx config located in the `nginx` folder. This one configure the root application folder in the `/app` folder.
 
-After building the app copy the `dist/olympic-games-starter` folder to the root application folder in the docker image.
+After building the app copy the `dist/olympic-games-starter/browser` folder to the root application folder in the docker image.
+
+The provided multi-stage `Dockerfile` does this for you:
+
+```bash
+docker compose up -d --build
+# the app is served on http://localhost
+```
 
 ### Publishing to GitLab Registry
 
@@ -86,3 +99,27 @@ To publish the application to a GitLab registry, follow these steps:
    npm publish
    ```
    This will publish the package to your GitLab registry.
+
+## Continuous Integration
+
+The pipeline is defined in `.github/workflows/ci.yml`. The same file is used, unchanged, in the Angular and Java repositories: a first `detect` job finds the project type (`package.json` or `build.gradle`) and the other jobs adapt with conditions.
+
+| Job | What it does |
+|---|---|
+| `detect` | Detects the project type (`node` or `gradle`) |
+| `test` | Installs the toolchain (with dependency cache), runs `./run-tests.sh`, uploads `test-results/` as an artifact and publishes the JUnit report in the run summary, even when tests fail |
+| `build` | Builds the Docker image, smoke-tests it (the container must really answer), then pushes it to `ghcr.io` |
+| `release` | On `main` only: [semantic-release](https://semantic-release.gitbook.io/) creates the version tag and the GitHub Release from the commit messages, then tags the tested image with that version |
+
+It runs on every push to `main` and `ci/**` branches, and on pull requests targeting `main` (pull requests are built and tested, never pushed).
+
+### Image tags
+
+Images are published to `ghcr.io/m0l42/<repository>`:
+
+- `<branch>-<short sha>` for every push, e.g. `ci-workflow-1a2b3c4` or `main-1a2b3c4`
+- `X.Y.Z` and `latest` for each release on `main`
+
+### Versioning
+
+Versions come from [Conventional Commits](https://www.conventionalcommits.org/): `fix:` bumps the patch, `feat:` the minor, `BREAKING CHANGE:` the major. The git tag is the source of truth; the version field in the build file is not updated.
