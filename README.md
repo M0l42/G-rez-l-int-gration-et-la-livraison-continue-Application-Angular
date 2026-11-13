@@ -71,6 +71,8 @@ docker compose up -d --build
 # the app is served on http://localhost
 ```
 
+A `Makefile` wraps the common commands for local development (`make help` lists them): `make install`, `make up`, `make down`, `make logs`, `make health`, `make test`. It is a convenience only: every target is a plain `docker compose` call.
+
 ### Publishing to GitLab Registry
 
 To publish the application to a GitLab registry, follow these steps:
